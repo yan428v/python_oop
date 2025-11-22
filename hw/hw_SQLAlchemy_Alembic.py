@@ -6,6 +6,7 @@ import csv
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional
+from auth import auth_router, verify_token
 
 engine = create_engine('sqlite:///students.db')
 Base = declarative_base()
@@ -140,6 +141,7 @@ class StudentDB:
 
 
 app = FastAPI(title="Student API", description="API для управления студентами")
+app.include_router(auth_router)
 
 def get_db():
     db = StudentDB()
@@ -150,7 +152,11 @@ def get_db():
 
 
 @app.post("/students/", response_model=StudentResponse, status_code=201)
-def create_student(student: StudentCreate, db: StudentDB = Depends(get_db)):
+def create_student(
+        student: StudentCreate,
+        db: StudentDB = Depends(get_db),
+        current_user = Depends(verify_token)
+):
     new_student = db.add_student(
         surname=student.surname,
         name=student.name,
@@ -162,13 +168,20 @@ def create_student(student: StudentCreate, db: StudentDB = Depends(get_db)):
 
 
 @app.get("/students/", response_model=List[StudentResponse])
-def read_students(db: StudentDB = Depends(get_db)):
+def read_students(
+        db: StudentDB = Depends(get_db),
+        current_user = Depends(verify_token)
+):
     students = db.get_all()
     return students
 
 
 @app.get("/students/{student_id}", response_model=StudentResponse)
-def read_student(student_id: int, db: StudentDB = Depends(get_db)):
+def read_student(
+        student_id: int,
+        db: StudentDB = Depends(get_db),
+        current_user = Depends(verify_token)
+):
     student = db.get_by_id(student_id)
     if not student:
         raise HTTPException(status_code=404, detail="студент не найден")
@@ -176,7 +189,12 @@ def read_student(student_id: int, db: StudentDB = Depends(get_db)):
 
 
 @app.put("/students/{student_id}", response_model=StudentResponse)
-def update_student(student_id: int, student_update: StudentUpdate, db: StudentDB = Depends(get_db)):
+def update_student(
+        student_id: int,
+        student_update: StudentUpdate,
+        db: StudentDB = Depends(get_db),
+        current_user = Depends(verify_token)
+):
     updated_student = db.update_student(
         student_id=student_id,
         surname=student_update.surname,
@@ -191,7 +209,11 @@ def update_student(student_id: int, student_update: StudentUpdate, db: StudentDB
 
 
 @app.delete("/students/{student_id}", status_code=204)
-def delete_student(student_id: int, db: StudentDB = Depends(get_db)):
+def delete_student(
+        student_id: int,
+        db: StudentDB = Depends(get_db),
+        current_user = Depends(verify_token)
+):
     success = db.delete_student(student_id)
     if not success:
         raise HTTPException(status_code=404, detail="студент не найден")
